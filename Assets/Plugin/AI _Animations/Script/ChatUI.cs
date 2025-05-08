@@ -1,21 +1,18 @@
 using UnityEngine;
 using TMPro;
 using System.Collections;
-using UnityEngine.UI;
 
 public class ChatUI : MonoBehaviour
 {
     public TMP_InputField inputField;
     public TMP_Text outputText;
     private OllamaChat ollamaChat;
-    public Button sendButton;
 
     void Start()
     {
-        ollamaChat = Object.FindAnyObjectByType<OllamaChat>();
+        ollamaChat = FindObjectOfType<OllamaChat>();
         outputText.gameObject.SetActive(true);
         outputText.color = Color.black;
-        sendButton.onClick.AddListener(SendMessage);
     }
 
     void UpdateChat(string message)
@@ -31,7 +28,7 @@ public class ChatUI : MonoBehaviour
 
     public void HandleFinalResponse(string response)
     {
-
+        
         UpdateChat(response);
     }
 
@@ -40,7 +37,9 @@ public class ChatUI : MonoBehaviour
         string userInput = inputField.text;
         if (!string.IsNullOrEmpty(userInput))
         {
+            Debug.Log("Prompt sent at: " + Time.time + "s");
             ollamaChat.SendMessageToOllama(userInput);
         }
     }
+
 }

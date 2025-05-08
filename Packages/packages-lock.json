@@ -1,9 +1,9 @@
 {
   "dependencies": {
     "com.lmnt.unity": {
-      "version": "file:C:/Users/izzaa/Downloads/LMNT-Unity-package-0.1.0.tgz",
+      "version": "file:com.lmnt.unity",
       "depth": 0,
-      "source": "local-tarball",
+      "source": "embedded",
       "dependencies": {}
     },
     "com.unity.ai.navigation": {
