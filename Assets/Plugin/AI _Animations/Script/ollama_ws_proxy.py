@@ -32,7 +32,7 @@ async def handle_ws(websocket):
             except Exception as e:
                 print("Failed to send request to Ollama:", e)
                 error_response = json.dumps({
-                    "response": "⚠️ Gagal konek ke Ollama. Cek apakah model aktif dan Ollama jalan.",
+                    "response": " Gagal konek ke Ollama. Cek apakah model aktif dan Ollama jalan.",
                     "done": True
                 })
                 await websocket.send(error_response)

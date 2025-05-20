@@ -42,7 +42,8 @@ public class Animation : MonoBehaviour
         if (animator == null) return;
 
         Debug.Log("Playing idle animation");
-        animator.SetTrigger("IdleBool");
+        animator.SetBool("IdleBool", true);
+        animator.SetBool("TalkBool", false);
         isTalking = false;
     }
 
@@ -54,7 +55,8 @@ public class Animation : MonoBehaviour
         CancelInvoke();
 
         Debug.Log("Playing talking animation");
-        animator.SetTrigger("TalkingBool");
+        animator.SetBool("TalkBool", true);
+        animator.SetBool("IdleBool", false);
         isTalking = true;
 
         // Don't auto-transition to idle when talking animation starts
