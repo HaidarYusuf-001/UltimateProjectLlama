@@ -44,7 +44,7 @@ public class LMNTAudioPlayer : MonoBehaviour
     private IEnumerator RequestAudio(string text)
     {
         string apiUrl = "https://api.lmnt.com/v1/ai/speech/bytes";
-        string jsonBody = $"{{\"voice\": \"{voiceId}\", \"text\": \"{EscapeJson(text)}\", \"model\": \"blizzard\"}}";
+        string jsonBody = $"{{\"voice\": \"{voiceId}\", \"text\": \"{EscapeJson(text)}\", \"model\": \"blizzard\", \"language\": \"id\"}}";
         byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
 
         using (UnityWebRequest request = UnityWebRequest.PostWwwForm(apiUrl, ""))

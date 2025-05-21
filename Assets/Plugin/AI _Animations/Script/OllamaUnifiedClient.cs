@@ -101,6 +101,53 @@ public class OllamaUnifiedClient : MonoBehaviour
             return;
         }
 
+        // Cek jika pertanyaannya adalah "siapa kamu"
+        string userInputLower = userInput.ToLower();
+
+        if (string.IsNullOrEmpty(userInput)) return;
+
+        if (isProcessing || waitingForAudio)
+        {
+            Debug.LogWarning("Masih memproses permintaan sebelumnya");
+            return;
+        }
+
+        // Deteksi pertanyaan "siapa kamu" dalam berbagai bentuk
+        if (userInputLower.Contains("siapa") && userInputLower.Contains("kamu"))
+        {
+            string customResponse = "Halo! Saya adalah virtual assistant yang dibuat oleh prodi Informatika UMM untuk membantu menjawab pertanyaan Anda. Apa yang bisa saya bantu?";
+            outputText.text = customResponse;
+            FinalizeResponse(customResponse, useAudio: true);
+            return;
+        }
+
+        else if ((userInputLower.Contains("informatika") || userInputLower.Contains("informatica")) && userInputLower.Contains("umm"))
+        {
+            string[] customResponses = new string[]
+            {
+        "Program Studi Informatika UMM memiliki visi menjadi program studi terkemuka dalam pengembangan ilmu pengetahuan, teknologi, rekayasa dan seni di bidang rekayasa perangkat lunak, sistem dan keamanan jaringan, sains data, dan game cerdas yang berlandaskan pada nilai-nilai Islam.",
+        "Misinya adalah menyelenggarakan pendidikan dan pembelajaran secara profesional dan islami, melakukan penelitian yang inovatif dan bermutu, mengabdi kepada masyarakat melalui teknologi informasi, serta menjalin kerja sama dengan berbagai lembaga.",
+        "Tujuannya adalah menghasilkan lulusan yang kompeten dan berjiwa wirausaha, menghasilkan karya penelitian yang mendukung pendidikan, serta menjalin kerja sama untuk kemajuan pendidikan dan pengabdian masyarakat."
+            };
+
+            outputText.text = "";
+            sentenceQueue.Clear();
+            sentenceDisplayQueue.Clear();
+            foreach (string sentence in customResponses)
+            {
+                sentenceQueue.Enqueue(sentence);
+                sentenceDisplayQueue.Enqueue(sentence);
+            }
+
+            if (sentencePlayerCoroutine == null)
+                sentencePlayerCoroutine = StartCoroutine(PlaySentencesSequentially());
+
+            return;
+        }
+
+
+
+        // Cek cache
         if (responseCache.ContainsKey(userInput))
         {
             string cached = responseCache[userInput];
@@ -109,8 +156,10 @@ public class OllamaUnifiedClient : MonoBehaviour
             return;
         }
 
+        // Lanjut kirim ke server jika tidak termasuk kasus khusus
         SendMessageToServer(userInput);
     }
+
 
     public async void SendMessageToServer(string message)
     {
@@ -247,8 +296,8 @@ public class OllamaUnifiedClient : MonoBehaviour
         {
             if (useAudio && audioPlayer != null)
             {
-                animationController?.SetBool("isTalking", true);
                 audioPlayer.PlayText(clean);
+                animationController?.SetBool("isTalking", true);
                 waitingForAudio = true;
             }
             else
