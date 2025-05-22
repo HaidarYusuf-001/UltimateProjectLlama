@@ -616,11 +616,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ce39e89c9f03b384da3549bd1aa7d7df, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-<<<<<<< HEAD
-  apiKey: e7540e3c3da448d082ba7bc9532c48fe
-=======
   apiKey: ef9ae1421f8f4964a410dcd0b9303509
->>>>>>> 146675b (update dictionary)
   voiceId: james
   audioSource: {fileID: 779566954}
 --- !u!4 &779566956

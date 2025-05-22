@@ -33,8 +33,9 @@ public class LMNTAudioPlayer : MonoBehaviour
     public void PlayText(string text)
     {
         Debug.Log($"[LMNTAudioPlayer] Requesting LMNT TTS for: {text}");
-        RequestAndCacheAudio(text);
+        StartCoroutine(RequestAudio(text));
     }
+
 
     public void RequestAndCacheAudio(string text)
     {

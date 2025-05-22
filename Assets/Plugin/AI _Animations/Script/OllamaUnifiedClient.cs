@@ -115,7 +115,7 @@ public class OllamaUnifiedClient : MonoBehaviour
         // Deteksi pertanyaan "siapa kamu" dalam berbagai bentuk
         if (userInputLower.Contains("siapa") && userInputLower.Contains("kamu"))
         {
-            string customResponse = "Halo! Saya adalah virtual assistant yang dibuat oleh prodi Informatika UMM untuk membantu menjawab pertanyaan Anda. Apa yang bisa saya bantu?";
+            string customResponse = "Halo! Saya adalah virtual assistant yang dapat berjalan secara offline yang dibuat oleh prodi Informatika UMM untuk membantu menjawab pertanyaan Anda. Apa yang bisa saya bantu?";
             outputText.text = customResponse;
             FinalizeResponse(customResponse, useAudio: true);
             return;
@@ -125,12 +125,14 @@ public class OllamaUnifiedClient : MonoBehaviour
         {
             string[] customResponses = new string[]
             {
-        "Program Studi Informatika UMM memiliki visi menjadi program studi terkemuka dalam pengembangan ilmu pengetahuan, teknologi, rekayasa dan seni di bidang rekayasa perangkat lunak, sistem dan keamanan jaringan, sains data, dan game cerdas yang berlandaskan pada nilai-nilai Islam.",
-        "Misinya adalah menyelenggarakan pendidikan dan pembelajaran secara profesional dan islami, melakukan penelitian yang inovatif dan bermutu, mengabdi kepada masyarakat melalui teknologi informasi, serta menjalin kerja sama dengan berbagai lembaga.",
-        "Tujuannya adalah menghasilkan lulusan yang kompeten dan berjiwa wirausaha, menghasilkan karya penelitian yang mendukung pendidikan, serta menjalin kerja sama untuk kemajuan pendidikan dan pengabdian masyarakat."
+        "Program Studi Informatika UMM memiliki visi menjadi program studi terkemuka dalam pengembangan ilmu pengetahuan.",
+        "Teknologi, rekayasa dan seni di bidang rekayasa perangkat lunak, sistem dan keamanan jaringan, sains data, dan game cerdas yang berlandaskan pada nilai-nilai Islam, Misinya adalah menyelenggarakan.",
+        "pendidikan dan pembelajaran secara profesional dan islami, melakukan penelitian yang inovatif dan bermutu, mengabdi kepada masyarakat melalui teknologi informasi, serta menjalin kerja sama dengan berbagai.",
+        "lembaga, Tujuannya adalah menghasilkan lulusan yang kompeten dan berjiwa wirausaha, menghasilkan karya penelitian yang mendukung pendidikan, serta menjalin kerja sama untuk kemajuan pendidikan dan pengabdian masyarakat."
             };
 
             outputText.text = "";
+            
             sentenceQueue.Clear();
             sentenceDisplayQueue.Clear();
             foreach (string sentence in customResponses)
@@ -202,10 +204,15 @@ public class OllamaUnifiedClient : MonoBehaviour
                 if (!string.IsNullOrWhiteSpace(sentence))
                 {
                     allSentences.Add(sentence);
+
+                    bool isFirstSentence = sentenceQueue.Count == 0;
+
                     sentenceQueue.Enqueue(sentence);
-                    if (sentencePlayerCoroutine == null)
+
+                    if (isFirstSentence && sentencePlayerCoroutine == null)
                         sentencePlayerCoroutine = StartCoroutine(PlaySentencesSequentially());
                 }
+
                 sentenceBuilder.Clear();
             }
         }
@@ -233,19 +240,16 @@ public class OllamaUnifiedClient : MonoBehaviour
     {
         while (sentenceQueue.Count > 0)
         {
-            waitingForAudio = true;
-
             string sentence = sentenceQueue.Dequeue();
-            Debug.Log("Sending TTS request for sentence: " + sentence);
             sentenceDisplayQueue.Enqueue(sentence);
-            audioPlayer.PlayText(sentence);
-
-            yield return new WaitUntil(() => !waitingForAudio);
+            audioPlayer.PlayText(sentence); // hanya enqueue + request audio, tidak menunggu
+            yield return null; // biar nggak ngebut banget
         }
 
         sentencePlayerCoroutine = null;
         isProcessing = false;
     }
+
 
     private void TriggerSpeakingAnimation()
     {
