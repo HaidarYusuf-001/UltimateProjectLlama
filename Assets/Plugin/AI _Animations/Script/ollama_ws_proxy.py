@@ -13,7 +13,7 @@ async def handle_ws(websocket):
         async with aiohttp.ClientSession() as session:
             headers = {"Content-Type": "application/json"}
             payload = {
-                "model": "sampri-custom:latest",
+                "model": "umm-informatika-assistant:latest",
                 "prompt": prompt,
                 "stream": True
             }
