@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.soupday.cc3_unity_tools": "file:C:/Users/ninid/Downloads/cc_unity_tools_URP-1.6.3.URP17/cc_unity_tools_URP-1.6.3.URP17",
     "com.unity.ai.navigation": "2.0.6",
     "com.unity.cinemachine": "3.1.3",
     "com.unity.collab-proxy": "2.7.1",

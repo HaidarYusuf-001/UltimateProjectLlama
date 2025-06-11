@@ -6,6 +6,14 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "com.soupday.cc3_unity_tools": {
+      "version": "file:C:/Users/ninid/Downloads/cc_unity_tools_URP-1.6.3.URP17/cc_unity_tools_URP-1.6.3.URP17",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.unity.render-pipelines.universal": "12.0.0"
+      }
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.6",
       "depth": 0,
