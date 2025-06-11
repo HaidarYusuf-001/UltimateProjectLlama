@@ -6,7 +6,7 @@ import whisper
 import io
 
 # Load Whisper once (startup)
-model = whisper.load_model("medium", device="cuda")
+model = whisper.load_model("medium", device = "cpu")
 
 def receive_all(sock, size):
     """Terima semua data dengan ukuran yang diharapkan."""
@@ -27,7 +27,7 @@ def process_audio(wav_bytes):
     audio = audio.astype(np.float32) / 32768.0
 
     # Transcribe langsung (Unity sudah kirim 16kHz mono)
-    result = model.transcribe(audio, language='id')
+    result = model.transcribe(audio, language='en')
     return result["text"]
 
 def main():
