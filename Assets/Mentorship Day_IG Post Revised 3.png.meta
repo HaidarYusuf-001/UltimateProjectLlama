@@ -140,6 +140,28 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
+    - serializedVersion: 2
+      name: Mentorship Day_IG Post Revised 3_2
+      rect:
+        serializedVersion: 2
+        x: 111
+        y: 161
+        width: 176
+        height: 119
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 91c00a4c084c03644b83de78e1782e75
+      internalID: -1377983825
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []
@@ -156,6 +178,7 @@ TextureImporter:
     nameFileIdTable:
       Mentorship Day_IG Post Revised 3_0: -164194677
       Mentorship Day_IG Post Revised 3_1: -1245336825
+      Mentorship Day_IG Post Revised 3_2: -1377983825
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
