@@ -24,25 +24,17 @@ public class OllamaUnifiedClient : MonoBehaviour
     public Animator animationController;
 
     private WebSocket websocket;
-    private Stopwatch stopwatch;
     private StringBuilder sentenceBuilder = new StringBuilder();
-    private List<string> allSentences = new List<string>();
-    private Dictionary<string, string> responseCache = new Dictionary<string, string>();
+    private Queue<string> sentenceQueueForAudio = new Queue<string>();
+    private Queue<string> sentenceQueueForDisplay = new Queue<string>();
 
-    private bool isProcessing = false;
-    private bool isReceivingResponse = false;
-    private bool waitingForAudio = false;
-    private Coroutine timeoutCoroutine;
-
-    private Queue<string> sentenceQueue = new Queue<string>();
-    private Coroutine sentencePlayerCoroutine = null;
-    private Queue<string> sentenceDisplayQueue = new Queue<string>();
+    private bool isAwaitingResponse = false;
+    private Coroutine audioRequestCoroutine = null;
 
     void Start()
     {
         if (animationController == null)
             animationController = GetComponent<Animator>() ?? FindAnyObjectByType<Animator>();
-
         if (audioPlayer == null)
             audioPlayer = GetComponent<LMNTAudioPlayer>() ?? FindAnyObjectByType<LMNTAudioPlayer>();
 
@@ -52,34 +44,26 @@ public class OllamaUnifiedClient : MonoBehaviour
             audioPlayer.OnAudioPlaybackComplete += HandleAudioPlaybackComplete;
         }
 
+        ConnectWebSocket();
+    }
+
+    private async void ConnectWebSocket()
+    {
         websocket = new WebSocket(websocketUrl);
 
         websocket.OnOpen += () => Debug.Log("WebSocket connected");
         websocket.OnError += (e) => Debug.LogError("WebSocket error: " + e);
-        websocket.OnClose += (e) =>
-        {
+        websocket.OnClose += (e) => {
             Debug.Log("WebSocket closed");
-            if (isProcessing) ReturnToIdle();
+            if (isAwaitingResponse) ReturnToIdle();
         };
 
-        websocket.OnMessage += (bytes) =>
-        {
+        websocket.OnMessage += (bytes) => {
             string msg = Encoding.UTF8.GetString(bytes);
             try
             {
                 OllamaResponse chunk = JsonUtility.FromJson<OllamaResponse>(msg);
-
-                bool isFinal = chunk.done;
-                HandleIncomingText(chunk.response, isFinal);
-
-                if (isFinal)
-                {
-                    stopwatch.Stop();
-                    Debug.Log($"Response complete. Latency: {stopwatch.Elapsed.TotalSeconds:F2}s");
-
-                    string finalText = string.Join(" ", allSentences);
-                    UpdateCache(inputField.text, finalText);
-                }
+                HandleIncomingText(chunk.response, chunk.done);
             }
             catch (Exception ex)
             {
@@ -87,259 +71,170 @@ public class OllamaUnifiedClient : MonoBehaviour
             }
         };
 
-        _ = websocket.Connect();
+        await websocket.Connect();
     }
 
     public void OnSendButtonPressed()
     {
         string userInput = inputField.text.Trim();
-        if (string.IsNullOrEmpty(userInput)) return;
+        if (string.IsNullOrEmpty(userInput) || isAwaitingResponse) return;
 
-        if (isProcessing || waitingForAudio)
-        {
-            Debug.LogWarning("Masih memproses permintaan sebelumnya");
-            return;
-        }
+        ResetState();
+        animationController?.SetBool("isThinking", true);
+        isAwaitingResponse = true;
 
-        // Cek jika pertanyaannya adalah "siapa kamu"
-        string userInputLower = userInput.ToLower();
-
-        if (string.IsNullOrEmpty(userInput)) return;
-
-        if (isProcessing || waitingForAudio)
-        {
-            Debug.LogWarning("Masih memproses permintaan sebelumnya");
-            return;
-        }
-
-        // Deteksi pertanyaan "siapa kamu" dalam berbagai bentuk
-        if (userInputLower.Contains("siapa") && userInputLower.Contains("kamu"))
+        // Logika custom response bisa ditaruh di sini
+        if (userInput.ToLower().Contains("siapa") && userInput.ToLower().Contains("kamu"))
         {
             string customResponse = "Halo! Saya adalah virtual assistant yang dapat berjalan secara offline yang dibuat oleh prodi Informatika UMM untuk membantu menjawab pertanyaan Anda. Apa yang bisa saya bantu?";
-            outputText.text = customResponse;
-            FinalizeResponse(customResponse, useAudio: true);
+            ProcessSingleSentence(customResponse);
+            isAwaitingResponse = false;
             return;
         }
 
-        else if ((userInputLower.Contains("informatika") || userInputLower.Contains("informatica")) && userInputLower.Contains("umm"))
-        {
-            string[] customResponses = new string[]
-            {
-        "Program Studi Informatika UMM memiliki visi menjadi program studi terkemuka dalam pengembangan ilmu pengetahuan.",
-        "Teknologi, rekayasa dan seni di bidang rekayasa perangkat lunak, sistem dan keamanan jaringan, sains data, dan game cerdas yang berlandaskan pada nilai-nilai Islam, Misinya adalah menyelenggarakan.",
-        "pendidikan dan pembelajaran secara profesional dan islami, melakukan penelitian yang inovatif dan bermutu, mengabdi kepada masyarakat melalui teknologi informasi, serta menjalin kerja sama dengan berbagai.",
-        "lembaga, Tujuannya adalah menghasilkan lulusan yang kompeten dan berjiwa wirausaha, menghasilkan karya penelitian yang mendukung pendidikan, serta menjalin kerja sama untuk kemajuan pendidikan dan pengabdian masyarakat."
-            };
-
-            outputText.text = "";
-            
-            sentenceQueue.Clear();
-            sentenceDisplayQueue.Clear();
-            foreach (string sentence in customResponses)
-            {
-                sentenceQueue.Enqueue(sentence);
-                sentenceDisplayQueue.Enqueue(sentence);
-            }
-
-            if (sentencePlayerCoroutine == null)
-                sentencePlayerCoroutine = StartCoroutine(PlaySentencesSequentially());
-
-            return;
-        }
-
-
-
-        // Cek cache
-        if (responseCache.ContainsKey(userInput))
-        {
-            string cached = responseCache[userInput];
-            outputText.text = cached;
-            FinalizeResponse(cached, useAudio: false);
-            return;
-        }
-
-        // Lanjut kirim ke server jika tidak termasuk kasus khusus
         SendMessageToServer(userInput);
     }
 
+    private void ResetState()
+    {
+        sentenceBuilder.Clear();
+        sentenceQueueForAudio.Clear();
+        sentenceQueueForDisplay.Clear();
+        outputText.text = "";
+
+        if (audioRequestCoroutine != null)
+        {
+            StopCoroutine(audioRequestCoroutine);
+            audioRequestCoroutine = null;
+        }
+    }
 
     public async void SendMessageToServer(string message)
     {
-        isProcessing = true;
-        isReceivingResponse = true;
-        waitingForAudio = false;
-        sentenceBuilder.Clear();
-        allSentences.Clear();
-        sentenceQueue.Clear();
-        sentenceDisplayQueue.Clear();
-        outputText.text = "";
-        stopwatch = Stopwatch.StartNew();
-
         if (websocket.State != WebSocketState.Open)
         {
-            Debug.Log("Menunggu koneksi WebSocket...");
+            Debug.LogWarning("WebSocket not connected. Attempting to reconnect...");
             await websocket.Connect();
         }
 
-        try
+        if (websocket.State == WebSocketState.Open)
         {
             await websocket.SendText(message);
-            timeoutCoroutine = StartCoroutine(CheckTimeout());
         }
-        catch (Exception ex)
+        else
         {
-            Debug.LogError("Gagal kirim ke WebSocket: " + ex.Message);
+            Debug.LogError("Failed to send message, WebSocket is not open.");
             ReturnToIdle();
         }
     }
 
     private void HandleIncomingText(string chunk, bool isFinal)
     {
-        foreach (char c in chunk)
+        sentenceBuilder.Append(chunk);
+
+        while (true)
         {
-            sentenceBuilder.Append(c);
-            if (c == '.')
+            string text = sentenceBuilder.ToString();
+            int sentenceEnd = text.IndexOfAny(new char[] { '.', '?', '!' });
+
+            if (sentenceEnd == -1) break;
+
+            string sentence = text.Substring(0, sentenceEnd + 1).Trim();
+            sentenceBuilder.Remove(0, sentenceEnd + 1);
+
+            if (!string.IsNullOrWhiteSpace(sentence))
             {
-                string sentence = sentenceBuilder.ToString().Trim();
-                if (!string.IsNullOrWhiteSpace(sentence))
-                {
-                    allSentences.Add(sentence);
-
-                    bool isFirstSentence = sentenceQueue.Count == 0;
-
-                    sentenceQueue.Enqueue(sentence);
-
-                    if (isFirstSentence && sentencePlayerCoroutine == null)
-                        sentencePlayerCoroutine = StartCoroutine(PlaySentencesSequentially());
-                }
-
-                sentenceBuilder.Clear();
+                ProcessSingleSentence(sentence);
             }
         }
 
-        if (isFinal && sentenceBuilder.Length > 0)
+        if (isFinal)
         {
             string leftover = sentenceBuilder.ToString().Trim();
             if (!string.IsNullOrWhiteSpace(leftover))
             {
-                allSentences.Add(leftover);
-                sentenceQueue.Enqueue(leftover);
-                if (sentencePlayerCoroutine == null)
-                    sentencePlayerCoroutine = StartCoroutine(PlaySentencesSequentially());
+                ProcessSingleSentence(leftover);
             }
             sentenceBuilder.Clear();
+            isAwaitingResponse = false;
         }
+    }
+
+    private void ProcessSingleSentence(string sentence)
+    {
+        sentenceQueueForAudio.Enqueue(sentence);
+        sentenceQueueForDisplay.Enqueue(sentence);
+
+        if (audioRequestCoroutine == null)
+        {
+            audioRequestCoroutine = StartCoroutine(RequestAudioSequentially());
+        }
+    }
+
+    private IEnumerator RequestAudioSequentially()
+    {
+        while (sentenceQueueForAudio.Count > 0)
+        {
+            string sentence = sentenceQueueForAudio.Dequeue();
+            audioPlayer.PlayText(sentence);
+            yield return new WaitForSeconds(0.1f);
+        }
+        audioRequestCoroutine = null;
     }
 
     private void OnAudioStartHandler()
     {
-        TriggerSpeakingAnimation();
-    }
-
-    private IEnumerator PlaySentencesSequentially()
-    {
-        while (sentenceQueue.Count > 0)
-        {
-            string sentence = sentenceQueue.Dequeue();
-            sentenceDisplayQueue.Enqueue(sentence);
-            audioPlayer.PlayText(sentence); // hanya enqueue + request audio, tidak menunggu
-            yield return null; // biar nggak ngebut banget
-        }
-
-        sentencePlayerCoroutine = null;
-        isProcessing = false;
-    }
-
-
-    private void TriggerSpeakingAnimation()
-    {
+        // Transisi: Thinking -> Talking atau tetap di Talking
+        animationController?.SetBool("isThinking", false);
         animationController?.SetBool("isTalking", true);
-        Debug.Log("Speaking animation triggered");
 
-        if (sentenceDisplayQueue.Count > 0)
+        if (sentenceQueueForDisplay.Count > 0)
         {
-            string sentenceToDisplay = sentenceDisplayQueue.Dequeue();
-            outputText.text += sentenceToDisplay + "\n";
-        }
-        else
-        {
-            Debug.LogWarning("Tidak ada kalimat yang tersedia untuk ditampilkan.");
+            string sentenceToDisplay = sentenceQueueForDisplay.Dequeue();
+            outputText.text += sentenceToDisplay + " ";
         }
     }
 
-    private void StopSpeakingAnimation()
+    private void HandleAudioPlaybackComplete()
     {
+        // Fungsi ini HANYA dipanggil ketika antrian audio di LMNTAudioPlayer habis.
+        Debug.Log("Rangkaian audio telah selesai diputar.");
+
+        // Langkah 1: Hentikan animasi berbicara.
         animationController?.SetBool("isTalking", false);
-        Debug.Log("Speaking animation stopped");
-        waitingForAudio = false;
-        isProcessing = false;
-    }
 
-    private IEnumerator CheckTimeout()
-    {
-        float startTime = Time.time;
-        while (isReceivingResponse && Time.time - startTime < responseTimeout)
-            yield return null;
-
-        if (isReceivingResponse)
+        // Langkah 2: Tentukan state selanjutnya.
+        // Apakah kita masih menunggu kalimat baru dari server atau masih ada antrian teks?
+        if (isAwaitingResponse || sentenceQueueForAudio.Count > 0)
         {
-            ReturnToIdle();
-        }
-    }
-
-    private void FinalizeResponse(string finalText, bool useAudio = true)
-    {
-        if (timeoutCoroutine != null)
-        {
-            StopCoroutine(timeoutCoroutine);
-            timeoutCoroutine = null;
-        }
-
-        string clean = finalText.Trim();
-        if (!string.IsNullOrEmpty(clean))
-        {
-            if (useAudio && audioPlayer != null)
-            {
-                audioPlayer.PlayText(clean);
-                animationController?.SetBool("isTalking", true);
-                waitingForAudio = true;
-            }
-            else
-            {
-                animationController?.SetBool("isTalking", false);
-                ReturnToIdle();
-            }
+            // Jika ya, masuk ke mode Thinking.
+            // Transisi: Talking -> Thinking
+            Debug.Log("Masih menunggu data, masuk ke mode Thinking.");
+            animationController?.SetBool("isThinking", true);
         }
         else
         {
-            Debug.LogWarning("Respons kosong");
-            ReturnToIdle();
+            // Jika tidak, semua proses sudah selesai. Kembali ke Idle.
+            // Transisi: Talking -> Idle
+            Debug.Log("Semua proses selesai, kembali ke Idle.");
+            ReturnToIdle(); // Ini akan mengatur isThinking ke false.
         }
     }
 
     private void ReturnToIdle()
     {
-        isProcessing = false;
-        isReceivingResponse = false;
-        waitingForAudio = false;
+        isAwaitingResponse = false;
         animationController?.SetBool("isTalking", false);
+        animationController?.SetBool("isThinking", false);
+        Debug.Log("System is now Idle.");
     }
 
-    private void HandleAudioPlaybackComplete()
+#if !UNITY_WEBGL || UNITY_EDITOR
+    void Update()
     {
-        Debug.Log("Kalimat selesai diputar");
-        waitingForAudio = false;
-        animationController?.SetBool("isTalking", false);
+        websocket?.DispatchMessageQueue();
     }
-
-    private void UpdateCache(string question, string response)
-    {
-        if (!responseCache.ContainsKey(question))
-        {
-            responseCache[question] = response;
-            Debug.Log("Cache disimpan untuk pertanyaan: " + question);
-        }
-    }
+#endif
 
     private void OnDestroy()
     {
@@ -348,15 +243,7 @@ public class OllamaUnifiedClient : MonoBehaviour
             audioPlayer.OnAudioStart -= OnAudioStartHandler;
             audioPlayer.OnAudioPlaybackComplete -= HandleAudioPlaybackComplete;
         }
-
         _ = websocket?.Close();
-    }
-
-    void Update()
-    {
-#if !UNITY_WEBGL || UNITY_EDITOR
-        websocket?.DispatchMessageQueue();
-#endif
     }
 
     [Serializable]
